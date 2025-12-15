@@ -3,18 +3,25 @@ plugins {
     id 'war'
 }
 
-group 'com.ticketpro'
-version '1.0-SNAPSHOT'
-
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+group = 'com.ticketpro'
+version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 dependencies {
     compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
+    implementation 'org.postgresql:postgresql:42.7.2'
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
 
-    implementation 'org.postgresql:postgresql:42.2.27'
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
