@@ -1,22 +1,35 @@
-import logo from './logo.svg';
+import React, {useEffect, useState} from 'react';
 import './App.css';
 
 function App() {
+  const [usuarios, setUsuarios] = useState([]);
+
+  useEffect(() => {
+    fetch('http://localhost:8080/users')
+      .then(response => response.json())
+      .then(data => {
+        console.log("Dados recebidos: ", data);
+        setUsuarios(data);
+      })
+      .catch(error => console.error('Erro ao buscar usuários: ', error));
+  }, []);
+  
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+        <h1>TicketPro Users</h1>
+          {usuarios.length === 0 ? (
+            <p>Carregando usuários ou sem conexão com a API...</p>
+          ) : (
+            <div className="user-list">
+              {usuarios.map((usuario) => (
+                <div key={usuario.id} className="user-card">
+                  <h3>{usuario.nome}</h3>
+                  <p>{usuario.email}</p>
+                </div>
+              ))}
+            </div>
+          )}
       </header>
     </div>
   );
