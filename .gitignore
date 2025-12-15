@@ -1,0 +1,55 @@
+# --- Geral / Sistema Operacional ---
+.DS_Store
+Thumbs.db
+*.log
+tmp/
+
+# --- IDEs (VS Code, IntelliJ, Eclipse) ---
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# --- Docker ---
+# Ignora volumes de dados locais
+postgres-data/
+redis-data/
+
+# --- GO (API) ---
+api-go/main
+api-go/main.exe
+api-go/bin/
+api-go/vendor/
+api-go/.env
+
+# --- JAVA / GRADLE (Worker) ---
+worker-java/.gradle/
+worker-java/build/
+worker-java/out/
+worker-java/bin/
+*.class
+*.jar
+*.war
+
+# --- REACT (Frontend) ---
+web-react/node_modules/
+web-react/build/
+web-react/dist/
+# Arquivos de ambiente locais (senhas/configs)
+web-react/.env.local
+web-react/.env.development.local
+web-react/.env.test.local
+web-react/.env.production.local
+# Logs de erro do React
+web-react/npm-debug.log*
+web-react/yarn-debug.log*
+web-react/yarn-error.log*
+# Testes e Cache
+web-react/coverage/
+web-react/.pnp
+web-react/.pnp.js
+
+# --- DATABASE ---
+*.sql.gz

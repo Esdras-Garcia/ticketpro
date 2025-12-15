@@ -1,0 +1,55 @@
+services:
+  database:
+    image: postgres:13-alpine
+    container_name: ticketpro-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: ticketpro_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+
+  api-go:
+    build: ./api-go
+    container_name: ticketpro-api-go
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: database
+      DB_USER: postgres
+      DB_PASS: 1234
+      DB_NAME: ticketpro_db
+    volumes:
+      - ./api-go:/app
+    depends_on:
+      - database
+  
+  worker-java:
+    build: ./worker-java
+    container_name: ticketpro-worker-java
+    ports:
+      - "8081:8080"
+    environment:
+      DB_URL: jdbc:postgresql://database:5432/ticketpro_db
+      DB_USER: postgres
+      DB_PASS: 1234
+    volumes:
+      - ./worker-java:/home/gradle/src
+    depends_on:
+      - database
+
+  frontend:
+    build: ./web-react
+    container_name: ticketpro-web
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    environment:
+     - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./web-react:/app
+      - /app/node_modules
+    depends_on:
+      - api-go
