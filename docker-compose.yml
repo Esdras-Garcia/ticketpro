@@ -17,15 +17,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DB_HOST: database
+      DB_HOST: database 
       DB_USER: postgres
       DB_PASS: 1234
       DB_NAME: ticketpro_db
-    volumes:
-      - ./api-go:/app
     depends_on:
       - database
-  
+
   worker-java:
     build: ./worker-java
     container_name: ticketpro-worker-java

@@ -1,4 +1,4 @@
-module ticketpro-api
+module api-go
 
 go 1.20
 

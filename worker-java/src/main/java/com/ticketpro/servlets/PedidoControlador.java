@@ -21,11 +21,21 @@ public class PedidoControlador extends HttpServlet {
         resp.setContentType("text/plain; charset=UTF-8");
         PrintWriter out = resp.getWriter();
 
-        int usuarioId = 1;
-        int eventoId = 1;
-        int quantidade = 8;
+        try {
+            // Pega da URL ou usa valores padrão se não for informado
+            String idParam = req.getParameter("usuarioId");
+            String eventoParam = req.getParameter("eventoId");
+            String qtdParam = req.getParameter("quantidade");
 
-        String resultado = pedidoBO.registrarCompra(usuarioId, eventoId, quantidade);
-        out.println(resultado);
+            int usuarioId = (idParam != null) ? Integer.parseInt(idParam) : 1;
+            int eventoId = (eventoParam != null) ? Integer.parseInt(eventoParam) : 1;
+            int quantidade = (qtdParam != null) ? Integer.parseInt(qtdParam) : 1; // Mudei padrão para 1
+
+            String resultado = pedidoBO.registrarCompra(usuarioId, eventoId, quantidade);
+            out.println(resultado);
+            
+        } catch (Exception e) {
+            out.println("Erro nos parâmetros: " + e.getMessage());
+        }
     }
 }
