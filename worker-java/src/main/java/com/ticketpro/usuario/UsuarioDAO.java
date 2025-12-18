@@ -97,4 +97,30 @@ public class UsuarioDAO {
             return stmt.executeUpdate() > 0;
         }
     }
+
+    public boolean adicionarSaldo(int usuarioId, java.math.BigDecimal valor) throws SQLException, ClassNotFoundException {
+        String sql = "UPDATE usuarios SET saldo = saldo + ? WHERE id = ?";
+        
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setBigDecimal(1, valor);
+            stmt.setInt(2, usuarioId);
+            
+            return stmt.executeUpdate() > 0;
+        }
+    }
+
+    public java.math.BigDecimal buscarSaldo(int usuarioId) throws SQLException, ClassNotFoundException {
+        String sql = "SELECT saldo FROM usuarios WHERE id = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, usuarioId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getBigDecimal("saldo");
+            }
+        }
+        return java.math.BigDecimal.ZERO;
+    }
 }

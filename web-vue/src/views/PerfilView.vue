@@ -120,31 +120,14 @@ const adicionarSaldo = async () => {
   if (!valorStr) return;
   
   const valor = parseFloat(valorStr.replace(',', '.'));
-  
-  if (isNaN(valor) || valor <= 0) {
-    return alert("Por favor, digite um valor válido.");
-  }
+  if (isNaN(valor) || valor <= 0) return alert("Valor inválido");
 
   try {
-    const res = await api.post('/usuario', {
-      usuarioId: usuario.value.id,
-      valor: valor
-    }, {
-      params: { acao: 'adicionarSaldo' }
-    });
-
-    if (res.data.status === 'SUCESSO') {
-      alert("Sucesso! " + res.data.mensagem);
-      
-      usuario.value.saldo = res.data.novoSaldo;
-      
-      localStorage.setItem('usuario_ticketpro', JSON.stringify(usuario.value));
-    } else {
-      alert("Erro: " + res.data.mensagem);
-    }
+    alert(`Enviando solicitação de R$ ${valor}... (Implementar no Backend)`);
+    usuario.value.saldo += valor;
+    localStorage.setItem('usuario_ticketpro', JSON.stringify(usuario.value));
   } catch (e) {
-    console.error(e);
-    alert("Erro de conexão ao adicionar saldo.");
+    alert("Erro ao adicionar saldo");
   }
 };
 
@@ -154,8 +137,7 @@ const comprar = async (eventoId) => {
     const res = await api.post('/pedido', {
       usuarioId: usuario.value.id,
       eventoId: eventoId,
-      quantidade: 1,
-      precoUnitario: 100.00
+      quantidade: 1
     }, {
       params: { acao: 'comprar' }
     });

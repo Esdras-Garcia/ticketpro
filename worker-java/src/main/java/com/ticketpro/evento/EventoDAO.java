@@ -17,7 +17,7 @@ public class EventoDAO {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, e.getNome());
-            stmt.setTimestamp(2, Timestamp.valueOf(e.getDataEvento())); // Conversão LocalDateTime -> SQL Timestamp
+            stmt.setTimestamp(2, Timestamp.valueOf(e.getDataEvento()));
             stmt.setString(3, e.getLocalizacao());
             stmt.setBoolean(4, true);
             

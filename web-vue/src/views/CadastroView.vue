@@ -91,12 +91,19 @@ const submitForm = async () => {
   errorMessage.value = '';
 
   try {
-    const response = await api.post('/usuarios', form);
+    const response = await api.post('/usuario', form, {
+      params: {
+        acao: 'cadastro'
+      }
+    });
 
-    console.log('Resposta do servidor:', response.data);
-    alert('Cadastro realizado com sucesso!');
-    
-    router.push('/'); 
+    if (response.data.status === 'SUCESSO') {
+        console.log('Resposta do servidor:', response.data);
+        alert('Cadastro realizado com sucesso!');
+        router.push('/'); 
+    } else {
+        errorMessage.value = response.data.mensagem || 'Erro ao realizar cadastro.';
+    }
 
   } catch (error) {
     console.error('Erro na requisição:', error);

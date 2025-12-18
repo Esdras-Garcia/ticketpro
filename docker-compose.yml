@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: 1234
       POSTGRES_DB: ticketpro_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./db:/docker-entrypoint-initdb.d
 
@@ -15,7 +15,7 @@ services:
     build: ./api-go
     container_name: ticketpro-api-go
     ports:
-      - "8080:8080"
+      - "8082:8080"
     environment:
       DB_HOST: database 
       DB_USER: postgres

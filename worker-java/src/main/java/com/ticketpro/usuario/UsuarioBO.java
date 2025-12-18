@@ -1,6 +1,8 @@
 package com.ticketpro.usuario;
 
-import com.google.gson.Gson; // Certifique-se de ter GSON ou Jackson no build.gradle
+import com.google.gson.Gson;
+
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,7 +17,6 @@ public class UsuarioBO {
             Usuario usuario = dao.buscarPorCredenciais(email, senha);
             
             if (usuario != null) {
-                // Remove a senha antes de devolver pro front por segurança
                 usuario.setSenha(null); 
                 resp.put("status", "SUCESSO");
                 resp.put("usuario", usuario);
@@ -102,6 +103,33 @@ public class UsuarioBO {
                 resp.put("mensagem", "Usuário não encontrado.");
             }
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.put("status", "ERRO_CRITICO");
+            resp.put("mensagem", e.getMessage());
+        }
+        return gson.toJson(resp);
+    }
+
+    public String adicionarSaldo(int usuarioId, BigDecimal valor) {
+        Map<String, Object> resp = new HashMap<>();
+        try {
+            if (valor == null || valor.compareTo(BigDecimal.ZERO) <= 0) {
+                resp.put("status", "ERRO");
+                resp.put("mensagem", "O valor deve ser maior que zero.");
+                return gson.toJson(resp);
+            }
+
+            if (dao.adicionarSaldo(usuarioId, valor)) {
+                BigDecimal novoSaldo = dao.buscarSaldo(usuarioId);
+                
+                resp.put("status", "SUCESSO");
+                resp.put("mensagem", "Saldo adicionado com sucesso!");
+                resp.put("novoSaldo", novoSaldo);
+            } else {
+                resp.put("status", "ERRO");
+                resp.put("mensagem", "Usuário não encontrado.");
+            }
         } catch (Exception e) {
             e.printStackTrace();
             resp.put("status", "ERRO_CRITICO");

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../services/api'
 
 const router = useRouter()
 const email = ref('')
@@ -9,20 +10,23 @@ const erro = ref('')
 
 const fazerLogin = async () => {
   try {
-    const res = await fetch('http://localhost:8081/usuario?acao=login', {
-      method: 'POST',
-      body: JSON.stringify({ email: email.value, senha: senha.value })
-    })
-    const data = await res.json()
+    const res = await api.post('/usuario', {
+      email: email.value, 
+      senha: senha.value 
+    }, {
+      params: { acao: 'login' }
+    });
+    
+    const data = res.data;
 
     if (data.status === 'SUCESSO') {
-      localStorage.setItem('usuario_ticketpro', JSON.stringify(data.usuario))
-      router.push('/dashboard')
+      localStorage.setItem('usuario_ticketpro', JSON.stringify(data.usuario));
+      router.push('/dashboard');
     } else {
-      erro.value = data.mensagem
+      erro.value = data.mensagem;
     }
   } catch (e) {
-    erro.value = "Erro de conexão com o servidor."
+    erro.value = "Erro de conexão com o servidor Java.";
   }
 }
 </script>

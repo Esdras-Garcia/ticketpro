@@ -26,12 +26,6 @@ public class PedidoControlador extends HttpServlet {
         processarRequisicao(req, resp);
     }
 
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        configurarCORS(resp);
-        resp.setStatus(HttpServletResponse.SC_OK);
-    }
-
     protected void processarRequisicao(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         configurarCORS(resp);
         resp.setContentType("application/json; charset=UTF-8");
@@ -53,7 +47,12 @@ public class PedidoControlador extends HttpServlet {
                     int usuarioId = json.get("usuarioId").getAsInt();
                     int eventoId = json.get("eventoId").getAsInt();
                     int quantidade = json.get("quantidade").getAsInt();
-                    BigDecimal precoUnitario = json.get("precoUnitario").getAsBigDecimal();
+                    BigDecimal precoUnitario;
+                    if (json.has("precoUnitario")) {
+                        precoUnitario = json.get("precoUnitario").getAsBigDecimal();
+                    } else {
+                        precoUnitario = new BigDecimal("100.00");
+                    }
 
                     out.print(pedidoBO.entrarNaFila(usuarioId, eventoId, quantidade, precoUnitario));
                     break;
