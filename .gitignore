@@ -4,7 +4,7 @@ Thumbs.db
 *.log
 tmp/
 
-# --- IDEs (VS Code, IntelliJ, Eclipse) ---
+# --- IDEs ---
 .idea/
 *.iml
 .classpath
@@ -13,7 +13,7 @@ tmp/
 .vscode/
 
 # --- Docker ---
-# Ignora volumes de dados locais
+# Ignora pastas de dados mapeadas no compose (se houver)
 postgres-data/
 redis-data/
 
@@ -24,7 +24,7 @@ api-go/bin/
 api-go/vendor/
 api-go/.env
 
-# --- JAVA / GRADLE (Worker) ---
+# --- JAVA (Worker) ---
 worker-java/.gradle/
 worker-java/build/
 worker-java/out/
@@ -33,23 +33,39 @@ worker-java/bin/
 *.jar
 *.war
 
-# --- REACT (Frontend) ---
-web-react/node_modules/
-web-react/build/
-web-react/dist/
-# Arquivos de ambiente locais (senhas/configs)
-web-react/.env.local
-web-react/.env.development.local
-web-react/.env.test.local
-web-react/.env.production.local
-# Logs de erro do React
-web-react/npm-debug.log*
-web-react/yarn-debug.log*
-web-react/yarn-error.log*
-# Testes e Cache
-web-react/coverage/
-web-react/.pnp
-web-react/.pnp.js
+# --- VUE.JS + TYPESCRIPT ---
+# Dependências do projeto
+web-vue/node_modules/
 
-# --- DATABASE ---
-*.sql.gz
+# Pasta de build final (gerada pelo Vite)
+web-vue/dist/
+
+# Arquivos de configuração local (senhas/env)
+web-vue/.env.local
+web-vue/.env.*.local
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+
+# Editor directories and files
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+.eslintcache
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/

@@ -2,10 +2,12 @@ package main
 
 import (
 	"api-go/internal/db"
-	"api-go/internal/repository"
-	"api-go/internal/worker"
+	"api-go/internal/ingresso"
+	"api-go/internal/pedido"
+	"api-go/internal/transacao"
+	"api-go/internal/usuario"
 	"log"
-	"net/http"
+	"sync"
 )
 
 func main() {
@@ -15,17 +17,30 @@ func main() {
 	}
 	defer conexao.Close()
 
-	pedidoRepo := repository.NewPedidoRepository(conexao)
+	repoUsuario := usuario.NewRepository(conexao)
+	repoIngresso := ingresso.NewRepository(conexao)
+	repoTransacao := transacao.NewRepository(conexao)
+	repoPedido := pedido.NewRepository(conexao)
 
-	qtdWorkers := 5
-	for i := 1; i <= qtdWorkers; i++ {
-		go worker.Iniciar(pedidoRepo, i)
+	processador := &pedido.Processador{
+		RepoPedido:    repoPedido,
+		RepoUsuario:   repoUsuario,
+		RepoIngresso:  repoIngresso,
+		RepoTransacao: repoTransacao,
 	}
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Sistema operando e workers ativos"))
-	})
+	log.Println("Servidor de Processamento (Worker) Iniciado")
 
-	log.Printf("Servidor e Workers rodando na porta 8080...")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	var wg sync.WaitGroup
+	numWorkers := 5
+
+	for i := 1; i <= numWorkers; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			processador.Iniciar(id)
+		}(i)
+	}
+
+	wg.Wait()
 }

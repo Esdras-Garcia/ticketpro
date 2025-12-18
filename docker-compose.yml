@@ -39,16 +39,15 @@ services:
       - database
 
   frontend:
-    build: ./web-react
+    build: ./web-vue
     container_name: ticketpro-web
     ports:
       - "3000:3000"
     stdin_open: true
     environment:
-     - CHOKIDAR_USEPOLLING=true
-     - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     volumes:
-      - ./web-react:/app
+      - ./web-vue:/app
       - /app/node_modules
     depends_on:
       - api-go
