@@ -89,42 +89,217 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import axios from 'axios';
 import api from '../services/api';
+import { store } from '../store';
 
 const eventos = ref([]);
 const loading = ref(false);
 const termoBusca = ref('');
-const usuario = ref(JSON.parse(localStorage.getItem('usuario_ticketpro') || '{}'));
 
-const modal = ref({ aberto: false, tipo: '', titulo: '', label: '', valor: 1, min: 1, max: 999999, step: 1, eventoAlvo: null, erro: '' });
+const modal = ref({
+  aberto: false,
+  tipo: '',
+  titulo: '',
+  label: '',
+  valor: 1,
+  min: 1,
+  max: 999999,
+  step: 1,
+  eventoAlvo: null,
+  erro: ''
+});
 const inputModal = ref(null);
 
 const eventosFiltrados = computed(() => {
   if (!termoBusca.value) return eventos.value;
   const termo = termoBusca.value.toLowerCase();
-  return eventos.value.filter(e => e.nome.toLowerCase().includes(termo) || e.localizacao.toLowerCase().includes(termo));
+  return eventos.value.filter(e => 
+    e.nome.toLowerCase().includes(termo) || 
+    e.localizacao.toLowerCase().includes(termo)
+  );
 });
+
+const formatarData = (dataObj) => {
+  if (!dataObj) return 'A definir';
+  if (typeof dataObj === 'string') return new Date(dataObj).toLocaleString('pt-BR');
+  if (dataObj.date) {
+    const { day, month, year } = dataObj.date;
+    const { hour, minute } = dataObj.time || { hour: 0, minute: 0 };
+    return `${day.toString().padStart(2,'0')}/${month.toString().padStart(2,'0')}/${year} às ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`;
+  }
+  return 'Data inválida';
+};
+
+const calcularPorcentagem = (ev) => {
+  if (!ev.numeroMaximoIngressos) return 0;
+  return ((ev.ingressosDisponiveis || 0) / ev.numeroMaximoIngressos) * 100;
+};
+
+const carregarEventos = async () => {
+  loading.value = true;
+  try {
+    const res = await axios.get('http://localhost:8082/eventos');
+    eventos.value = res.data;
+  } catch (error) {
+    console.error("Erro ao listar eventos:", error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const atualizarDadosUsuario = async () => {
+  if (!store.usuario.id) return;
+  try {
+    const res = await api.get(`/usuario?acao=buscar&id=${store.usuario.id}`);
+    if (res.data.status === 'SUCESSO') {
+        store.fazerLogin(res.data.usuario);
+    }
+  } catch (e) {
+    console.error("Erro ao sincronizar saldo", e);
+  }
+};
+
+const excluirEvento = async (id) => {
+  if (!confirm("Tem certeza que deseja EXCLUIR este evento?")) return;
+  try {
+    const res = await api.post('/evento', { id }, { params: { acao: 'excluir' } });
+    if (res.data.status === 'SUCESSO') {
+      alert("Evento excluído!");
+      carregarEventos();
+    } else {
+      alert("Erro: " + res.data.mensagem);
+    }
+  } catch (e) {
+    alert("Erro ao excluir.");
+  }
+};
+
+const abrirModal = (tipo, evento) => {
+  modal.value = { 
+    aberto: true, 
+    tipo, 
+    titulo: tipo === 'comprar' ? `Comprar: ${evento.nome}` : 'Simular Stress Test', 
+    label: 'Quantidade:', 
+    valor: tipo === 'stress' ? 50 : 1, 
+    min: 1, 
+    max: tipo === 'stress' ? 500 : (evento.ingressosDisponiveis || 1), 
+    step: 1, 
+    eventoAlvo: evento, 
+    erro: '' 
+  };
+  nextTick(() => { if(inputModal.value) inputModal.value.focus(); });
+};
+
+const fecharModal = () => { modal.value.aberto = false; };
+
+const confirmarModal = async () => {
+  const valor = parseInt(modal.value.valor);
+  if (isNaN(valor) || valor < modal.value.min) { 
+      modal.value.erro = `Valor inválido.`; 
+      return; 
+  }
+  
+  if (modal.value.tipo === 'comprar') {
+      await executarCompra(modal.value.eventoAlvo, valor);
+  } else {
+      await executarStress(modal.value.eventoAlvo.id, valor);
+  }
+  
+  fecharModal();
+};
 
 const validarApenasNumeros = (e) => {
   let val = e.target.value.replace(/\D/g, '');
   if (val.length > 7) val = val.slice(0, 7);
-  if (val === '') { modal.value.valor = ''; return; }
-  let num = parseInt(val);
-  if (num > modal.value.max) num = modal.value.max;
-  modal.value.valor = num;
-  e.target.value = num;
+  modal.value.valor = val === '' ? '' : parseInt(val);
+  e.target.value = val;
 };
 
-const formatarData = (dataObj) => { if (!dataObj) return 'A definir'; if (typeof dataObj === 'string') return new Date(dataObj).toLocaleString('pt-BR'); if (dataObj.date) { const { day, month, year } = dataObj.date; const { hour, minute } = dataObj.time || { hour: 0, minute: 0 }; return `${day.toString().padStart(2,'0')}/${month.toString().padStart(2,'0')}/${year} às ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`; } return 'Data inválida'; };
-const calcularPorcentagem = (ev) => { if (!ev.numeroMaximoIngressos) return 0; return ((ev.ingressosDisponiveis || 0) / ev.numeroMaximoIngressos) * 100; };
+const executarCompra = async (evento, quantidade) => {
+  if (store.usuario.saldo < evento.preco * quantidade) { 
+      alert(`Saldo insuficiente.`); 
+      return; 
+  }
+  
+  try {
+    const res = await fetch('http://localhost:8081/pedido?acao=comprar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        usuarioId: store.usuario.id,
+        eventoId: evento.id,
+        quantidade,
+        precoUnitario: evento.preco
+      })
+    });
+    
+    const data = await res.json();
+    if (data.status === 'SUCESSO') {
+      alert(`Pedido #${data.pedidoId} enviado!`);
+      await atualizarDadosUsuario();
+      await carregarEventos();
+    } else {
+      alert("Erro: " + data.mensagem);
+    }
+  } catch (e) {
+    alert("Erro de conexão.");
+  }
+};
 
-const carregarEventos = async () => { loading.value = true; try { const res = await axios.get('http://localhost:8082/eventos'); eventos.value = res.data; } catch (error) { console.error(error); } finally { loading.value = false; } };
-const excluirEvento = async (id) => { if (!confirm("Tem certeza que deseja EXCLUIR este evento?")) return; try { const res = await api.post('/evento', { id }, { params: { acao: 'excluir' } }); if (res.data.status === 'SUCESSO') { alert("Evento excluído!"); carregarEventos(); } else { alert("Erro: " + res.data.mensagem); } } catch (e) { alert("Erro ao excluir."); } };
-const abrirModal = (tipo, evento) => { modal.value = { aberto: true, tipo, titulo: tipo === 'comprar' ? `Comprar: ${evento.nome}` : 'Simular Stress Test', label: 'Quantidade:', valor: tipo === 'stress' ? 50 : 1, min: 1, max: tipo === 'stress' ? 500 : (evento.ingressosDisponiveis || 1), step: 1, eventoAlvo: evento, erro: '' }; nextTick(() => { if(inputModal.value) inputModal.value.focus(); }); };
-const fecharModal = () => { modal.value.aberto = false; };
-const confirmarModal = async () => { const valor = parseInt(modal.value.valor); if (isNaN(valor) || valor < modal.value.min) { modal.value.erro = `A quantidade mínima é ${modal.value.min}.`; return; } modal.value.tipo === 'comprar' ? await executarCompra(modal.value.eventoAlvo, valor) : await executarStress(modal.value.eventoAlvo.id, valor); fecharModal(); };
-const executarCompra = async (evento, quantidade) => { const usuarioLocal = JSON.parse(localStorage.getItem('usuario_ticketpro') || '{}'); if (usuarioLocal.saldo < evento.preco * quantidade) { alert(`Saldo insuficiente.`); return; } try { const res = await fetch('http://localhost:8081/pedido?acao=comprar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarioId: usuarioLocal.id, eventoId: evento.id, quantidade, precoUnitario: evento.preco }) }); const data = await res.json(); if (data.status === 'SUCESSO') { alert(`Pedido #${data.pedidoId} enviado!`); setTimeout(() => location.reload(), 1500); } else { alert("Erro: " + data.mensagem); } } catch (e) { alert("Erro de conexão."); } };
-const executarStress = async (eventoId, quantidadePedidos) => { const requests = []; loading.value = true; for (let i = 0; i < quantidadePedidos; i++) { requests.push(fetch('http://localhost:8081/pedido?acao=comprar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarioId: usuario.value.id, eventoId, quantidade: 1, precoUnitario: 100.00 }) }).then(res => res.json())); } try { const resultados = await Promise.all(requests); const sucessos = resultados.filter(r => r.status === 'SUCESSO').length; alert(`Stress Test: ${sucessos} / ${quantidadePedidos} pedidos aceitos.`); setTimeout(() => location.reload(), 2000); } catch (e) { console.error(e); } finally { loading.value = false; } };
-onMounted(() => carregarEventos());
+const executarStress = async (eventoId, quantidadePedidos) => {
+  loading.value = true;
+
+  try {
+    const valorNecessario = 50000.00;
+    await api.post('/usuario', { 
+      usuarioId: store.usuario.id, 
+      valor: valorNecessario 
+    }, { params: { acao: 'adicionarSaldo' } });
+    
+    store.usuario.saldo += valorNecessario;
+    localStorage.setItem('usuario_ticketpro', JSON.stringify(store.usuario));
+    
+  } catch (e) {
+    alert("Erro ao preparar saldo para o Stress Test.");
+    loading.value = false;
+    return;
+  }
+
+  const requests = [];
+  for (let i = 0; i < quantidadePedidos; i++) {
+    const req = fetch('http://localhost:8081/pedido?acao=comprar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        usuarioId: store.usuario.id,
+        eventoId: eventoId,
+        quantidade: 1, 
+        precoUnitario: 100.00 
+      })
+    }).then(res => res.json()).catch(err => ({ status: 'ERRO_REDE' }));
+    
+    requests.push(req);
+  }
+
+  try {
+    const resultados = await Promise.all(requests);
+    const sucessos = resultados.filter(r => r.status === 'SUCESSO').length;
+    const falhas = quantidadePedidos - sucessos;
+
+    alert(`Stress Test Concluído!\n✅ Aceitos: ${sucessos}\n❌ Recusados: ${falhas}`);
+    
+    await atualizarDadosUsuario(); 
+    await carregarEventos();       
+
+  } catch (e) {
+    console.error(e);
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  carregarEventos();
+});
 </script>
 
 <style scoped>
