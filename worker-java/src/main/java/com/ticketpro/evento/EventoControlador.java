@@ -26,7 +26,6 @@ public class EventoControlador extends HttpServlet {
     }
 
     protected void processarRequisicao(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        configurarCORS(resp);
         resp.setContentType("application/json; charset=UTF-8");
         PrintWriter out = resp.getWriter();
 
@@ -51,7 +50,10 @@ public class EventoControlador extends HttpServlet {
                     String data = json.get("data").getAsString();
                     String local = json.get("localizacao").getAsString();
                     
-                    out.print(eventoBO.cadastrar(nome, data, local));
+                    int qtd = json.get("numeroMaximoIngressos").getAsInt();
+                    java.math.BigDecimal preco = json.get("preco").getAsBigDecimal();
+                    
+                    out.print(eventoBO.cadastrar(nome, data, local, qtd, preco));
                     break;
                 }
 
@@ -90,17 +92,5 @@ public class EventoControlador extends HttpServlet {
             e.printStackTrace();
             out.print("{\"status\": \"ERRO\", \"mensagem\": \"Erro interno ao processar requisição: " + e.getMessage() + "\"}");
         }
-    }
-
-    private void configurarCORS(HttpServletResponse resp) {
-        resp.setHeader("Access-Control-Allow-Origin", "*");
-        resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-        resp.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    }
-    
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        configurarCORS(resp);
-        resp.setStatus(HttpServletResponse.SC_OK);
     }
 }

@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,18 +12,30 @@ import com.ticketpro.db.Conexao;
 
 public class EventoDAO {
 
-    public boolean salvar(Evento e) throws SQLException, ClassNotFoundException {
-        String sql = "INSERT INTO eventos (nome, data_evento, localizacao, ativo) VALUES (?, ?, ?, ?)";
+    public int salvar(Evento e) throws SQLException, ClassNotFoundException {
+        String sql = "INSERT INTO eventos (nome, data_evento, localizacao, numero_maximo_ingressos, preco, ativo) VALUES (?, ?, ?, ?, ?, ?)";
+        
         try (Connection conn = Conexao.getConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             
             stmt.setString(1, e.getNome());
             stmt.setTimestamp(2, Timestamp.valueOf(e.getDataEvento()));
             stmt.setString(3, e.getLocalizacao());
-            stmt.setBoolean(4, true);
+            stmt.setInt(4, e.getNumeroMaximoIngressos());
+            stmt.setBigDecimal(5, e.getPreco());
+            stmt.setBoolean(6, true);
             
-            return stmt.executeUpdate() > 0;
+            int rows = stmt.executeUpdate();
+            
+            if (rows > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        return rs.getInt(1);
+                    }
+                }
+            }
         }
+        return -1;
     }
 
     public List<Evento> listarAtivos() throws SQLException, ClassNotFoundException {
@@ -40,6 +53,9 @@ public class EventoDAO {
                 e.setLocalizacao(rs.getString("localizacao"));
                 e.setAtivo(rs.getBoolean("ativo"));
                 e.setDataEvento(rs.getTimestamp("data_evento").toLocalDateTime());
+                e.setNumeroMaximoIngressos(rs.getInt("numero_maximo_ingressos"));
+                e.setPreco(rs.getBigDecimal("preco"));
+                
                 lista.add(e);
             }
         }

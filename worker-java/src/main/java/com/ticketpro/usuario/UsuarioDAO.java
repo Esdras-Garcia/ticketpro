@@ -123,4 +123,20 @@ public class UsuarioDAO {
         }
         return java.math.BigDecimal.ZERO;
     }
+
+    public Usuario buscarPorId(int id) throws SQLException, ClassNotFoundException {
+        String sql = "SELECT * FROM usuarios WHERE id = ?";
+        
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+            
+            if (rs.next()) {
+                return mapearUsuario(rs);
+            }
+        }
+        return null;
+    }
 }

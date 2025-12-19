@@ -137,4 +137,24 @@ public class UsuarioBO {
         }
         return gson.toJson(resp);
     }
+
+    public String buscar(int id) {
+        Map<String, Object> resp = new HashMap<>();
+        try {
+            Usuario u = dao.buscarPorId(id);
+            if (u != null) {
+                u.setSenha(null);
+                resp.put("status", "SUCESSO");
+                resp.put("usuario", u);
+            } else {
+                resp.put("status", "ERRO");
+                resp.put("mensagem", "Usuário não encontrado.");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.put("status", "ERRO_CRITICO");
+            resp.put("mensagem", e.getMessage());
+        }
+        return gson.toJson(resp);
+    }
 }

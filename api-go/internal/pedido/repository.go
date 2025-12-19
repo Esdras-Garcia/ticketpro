@@ -14,12 +14,20 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) BuscarPendentes(limite int) ([]Pedido, error) {
-	rows, err := r.DB.Query(`
-		SELECT id, usuario_id, evento_id, quantidade, valor_total, status 
-		FROM pedidos_fila 
-		WHERE status = 'PENDENTE' 
-		ORDER BY data_pedido ASC 
-		LIMIT $1`, limite)
+	query := `
+		UPDATE pedidos_fila
+		SET status = 'PROCESSANDO', data_atualizacao = NOW()
+		WHERE id IN (
+			SELECT id
+			FROM pedidos_fila
+			WHERE status = 'PENDENTE'
+			ORDER BY data_pedido ASC
+			FOR UPDATE SKIP LOCKED
+			LIMIT $1
+		)
+		RETURNING id, usuario_id, evento_id, quantidade, valor_total, status`
+
+	rows, err := r.DB.Query(query, limite)
 	if err != nil {
 		return nil, err
 	}

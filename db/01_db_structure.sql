@@ -13,6 +13,8 @@ CREATE TABLE eventos (
     nome VARCHAR(150) NOT NULL,
     data_evento TIMESTAMP NOT NULL,
     localizacao VARCHAR(100),
+    numero_maximo_ingressos INT DEFAULT 0,
+    preco DECIMAL(10,2) DEFAULT 0.00,
     ativo BOOLEAN DEFAULT TRUE
 );
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="cadastro-container">
+  <div class="auth-container">
     <div class="card">
       <h2>Novo Cadastro</h2>
       
@@ -12,9 +12,15 @@
             v-model="form.nome" 
             placeholder="Digite o nome" 
             required
+            minlength="3"
+            maxlength="30"
+            @input="form.nome = form.nome.replace(/[^a-zA-ZÀ-ÿ\s]/g, '')"
             :class="{ 'error-input': errors.nome }"
           />
-          <span v-if="errors.nome" class="error-msg">{{ errors.nome }}</span>
+          <div class="info-row">
+             <span v-if="errors.nome" class="error-msg">{{ errors.nome }}</span>
+             <small class="counter">{{ form.nome.length }}/30</small>
+          </div>
         </div>
 
         <div class="form-group">
@@ -25,7 +31,10 @@
             v-model="form.email" 
             placeholder="email@exemplo.com" 
             required
+            maxlength="30"
+            @input="form.email = form.email.replace(/[^a-zA-Z0-9@._-]/g, '')"
           />
+          <small class="counter">{{ form.email.length }}/30</small>
         </div>
 
         <div class="form-group">
@@ -37,12 +46,18 @@
             placeholder="********" 
             required
             minlength="6"
+            maxlength="20"
+            @input="form.senha = form.senha.replace(/[^a-zA-Z0-9]/g, '')"
           />
+          <div class="info-row">
+            <small style="font-size: 0.75rem; color: #777;">Apenas letras e números.</small>
+            <small class="counter">{{ form.senha.length }}/20</small>
+          </div>
         </div>
 
         <div class="actions">
           <button type="button" class="btn-cancel" @click="cancelar">Cancelar</button>
-          <button type="submit" class="btn-save" :disabled="isLoading">
+          <button type="submit" class="btn-primary" :disabled="isLoading">
             {{ isLoading ? 'Salvando...' : 'Salvar Cadastro' }}
           </button>
         </div>
@@ -61,177 +76,60 @@ import { useRouter } from 'vue-router';
 import api from '../services/api';
 
 const router = useRouter();
-
-const form = reactive({
-  nome: '',
-  email: '',
-  senha: ''
-});
-
+const form = reactive({ nome: '', email: '', senha: '' });
 const isLoading = ref(false);
 const errorMessage = ref('');
 const errors = reactive({});
 
 const validarFormulario = () => {
   errors.nome = '';
-  let isValid = true;
-
   if (form.nome.length < 3) {
     errors.nome = 'O nome deve ter pelo menos 3 caracteres.';
-    isValid = false;
+    return false;
   }
-
-  return isValid;
+  return true;
 };
 
 const submitForm = async () => {
   if (!validarFormulario()) return;
-
   isLoading.value = true;
   errorMessage.value = '';
-
   try {
-    const response = await api.post('/usuario', form, {
-      params: {
-        acao: 'cadastro'
-      }
-    });
-
+    const response = await api.post('/usuario', form, { params: { acao: 'cadastro' } });
     if (response.data.status === 'SUCESSO') {
-        console.log('Resposta do servidor:', response.data);
         alert('Cadastro realizado com sucesso!');
         router.push('/'); 
     } else {
         errorMessage.value = response.data.mensagem || 'Erro ao realizar cadastro.';
     }
-
   } catch (error) {
-    console.error('Erro na requisição:', error);
-    if (error.response) {
-       errorMessage.value = `Erro: ${error.response.data.message || 'Falha no servidor'}`;
-    } else if (error.request) {
-       errorMessage.value = 'Sem resposta do servidor. Verifique se o backend está rodando.';
-    } else {
-       errorMessage.value = 'Erro ao configurar a requisição.';
-    }
+    errorMessage.value = 'Erro ao conectar com o servidor.';
   } finally {
     isLoading.value = false;
   }
 };
 
-const cancelar = () => {
-  router.back();
-};
+const cancelar = () => router.back();
 </script>
 
 <style scoped>
-.cadastro-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80vh;
-  padding: 20px;
-  background-color: #f4f6f8;
-}
-
-.card {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 500px;
-}
-
-h2 {
-  margin-bottom: 1.5rem;
-  color: #333;
-  text-align: center;
-}
-
-.form-group {
-  margin-bottom: 1.2rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #555;
-}
-
-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.3s;
-}
-
-input:focus {
-  border-color: #4CAF50;
-  outline: none;
-}
-
-.error-input {
-  border-color: #e74c3c;
-}
-
-.error-msg {
-  color: #e74c3c;
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-  display: block;
-}
-
-.actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 2rem;
-  gap: 1rem;
-}
-
-button {
-  flex: 1;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-save {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.btn-save:hover:not(:disabled) {
-  background-color: #45a049;
-}
-
-.btn-save:disabled {
-  background-color: #a5d6a7;
-  cursor: not-allowed;
-}
-
-.btn-cancel {
-  background-color: #e0e0e0;
-  color: #333;
-}
-
-.btn-cancel:hover {
-  background-color: #d5d5d5;
-}
-
-.alert.error {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background-color: #fdecea;
-  color: #e74c3c;
-  border: 1px solid #fadbd8;
-  border-radius: 4px;
-  text-align: center;
-}
+.auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #2c3e50; }
+.card { background: white; padding: 2.5rem; border-radius: 10px; width: 100%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+h2 { text-align: center; color: #333; margin-bottom: 20px; }
+.form-group { margin-bottom: 15px; }
+label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; box-sizing: border-box; background: white; color: #333; }
+input:focus { border-color: #3498db; outline: none; }
+.info-row { display: flex; justify-content: space-between; margin-top: 4px; }
+.counter { display: block; text-align: right; font-size: 0.75rem; color: #999; margin-left: auto; }
+.error-input { border-color: #e74c3c; }
+.error-msg { color: #e74c3c; font-size: 0.85rem; }
+.actions { display: flex; gap: 10px; margin-top: 20px; }
+button { flex: 1; padding: 12px; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+.btn-primary { background: #3498db; color: white; }
+.btn-primary:hover:not(:disabled) { background: #2980b9; }
+.btn-primary:disabled { background: #bdc3c7; cursor: not-allowed; }
+.btn-cancel { background: #95a5a6; color: white; }
+.btn-cancel:hover { background: #7f8c8d; }
+.alert.error { margin-top: 15px; padding: 10px; border-radius: 5px; text-align: center; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 </style>

@@ -1,321 +1,161 @@
 <template>
-  <div class="dashboard-layout">
-    <aside class="sidebar">
-      <div class="user-info">
-        <div class="avatar">{{ iniciais }}</div>
-        <h3>{{ usuario.nome }}</h3>
-        <p class="email">{{ usuario.email }}</p>
+  <div class="dashboard-content">
+    <div class="header-content">
+      <h1>Próximos Eventos</h1>
+      <div class="search-box">
+        <input 
+          type="text" 
+          v-model="termoBusca" 
+          placeholder="Buscar evento..." 
+          maxlength="50" 
+        />
       </div>
-      
-      <div class="saldo-box">
-        <span>Saldo Atual</span>
-        <h2>R$ {{ usuario.saldo ? usuario.saldo.toFixed(2) : '0.00' }}</h2>
-        <button @click="adicionarSaldo" class="btn-add-saldo">+ Adicionar Saldo</button>
-      </div>
+    </div>
 
-      <nav class="menu">
-        <router-link to="/perfil" class="menu-item">👤 Meu Perfil</router-link>
-        <router-link to="/meus-pedidos" class="menu-item">🎟️ Meus Pedidos</router-link>
-        <router-link to="/evento/novo" class="menu-item">📅 Criar Evento</router-link> 
-        <button @click="logout" class="menu-item btn-logout">🚪 Sair</button>
-      </nav>
-    </aside>
+    <div v-if="loading" class="loading-state">
+      <p>Carregando eventos...</p>
+    </div>
 
-    <main class="content">
-      <div class="header-content">
-        <h1>Próximos Eventos</h1>
-        
-        <div class="search-box">
-          <input 
-            type="text" 
-            v-model="termoBusca" 
-            placeholder="Buscar evento por nome ou local..."
-          />
+    <div v-else class="grid">
+      <div v-for="evento in eventosFiltrados" :key="evento.id" class="card-box card-evento">
+        <div class="card-header">
+           <div class="header-top">
+             <h3 :title="evento.nome">{{ evento.nome }}</h3>
+             <button @click.stop="excluirEvento(evento.id)" class="btn-trash" title="Excluir Evento">🗑️</button>
+           </div>
+           <span class="price-badge">R$ {{ evento.preco ? evento.preco.toFixed(2) : '0.00' }}</span>
         </div>
-      </div>
-
-      <div v-if="loading" class="loading">Carregando eventos...</div>
-
-      <div v-else class="grid">
-        <div v-for="evento in eventosFiltrados" :key="evento.id" class="card">
-          <div class="card-header">
-            <h3>{{ evento.nome }}</h3>
-            <span class="badge">R$ 100,00</span> </div>
+        
+        <div class="card-body">
+          <p><strong>📅 Data:</strong> {{ formatarData(evento.dataEvento) }}</p>
+          <p class="info-row">
+            <strong>📍 Local:</strong> 
+            <span class="truncate" :title="evento.localizacao">
+              {{ evento.localizacao }}
+            </span>
+          </p>
           
-          <div class="card-body">
-            <p><strong>📅 Data:</strong> {{ formatarData(evento.dataEvento) }}</p>
-            <p><strong>📍 Local:</strong> {{ evento.localizacao }}</p>
+          <div class="disponibilidade">
+             <span>Ingressos: <strong>{{ evento.ingressosDisponiveis || 0 }}</strong> / {{ evento.numeroMaximoIngressos }}</span>
+             <div class="progress-bar">
+               <div class="progress-fill" :style="{ width: calcularPorcentagem(evento) + '%' }"></div>
+             </div>
           </div>
+        </div>
 
-          <button @click="comprar(evento.id)" class="btn-comprar">
-            COMPRAR INGRESSO
+        <div class="card-actions">
+          <button 
+            @click="abrirModal('comprar', evento)" 
+            class="btn-primary btn-full" 
+            :disabled="(evento.ingressosDisponiveis || 0) <= 0">
+            {{ (evento.ingressosDisponiveis || 0) > 0 ? 'COMPRAR' : 'ESGOTADO' }}
+          </button>
+          
+          <button @click="abrirModal('stress', evento)" class="btn-stress" title="Stress Test">
+            ⚡
           </button>
         </div>
       </div>
+    </div>
 
-      <p v-if="!loading && eventosFiltrados.length === 0" class="empty-state">
-        Nenhum evento encontrado para "{{ termoBusca }}".
-      </p>
-    </main>
+    <div v-if="modal.aberto" class="modal-overlay">
+      <div class="modal-content">
+        <h3 :title="modal.titulo">{{ modal.titulo }}</h3>
+        
+        <div class="form-group">
+          <label>{{ modal.label }}</label>
+          <input 
+            type="tel" 
+            v-model="modal.valor" 
+            @input="validarApenasNumeros"
+            @keydown.enter="confirmarModal"
+            ref="inputModal"
+            placeholder="Digite a quantidade"
+          />
+          <small class="info-text">Máximo permitido: {{ modal.max }}</small>
+          <small v-if="modal.erro" class="error-msg">{{ modal.erro }}</small>
+        </div>
+
+        <div class="modal-actions">
+          <button @click="fecharModal" class="btn-danger">Cancelar</button>
+          <button @click="confirmarModal" class="btn-primary">Confirmar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, nextTick } from 'vue';
+import axios from 'axios';
 import api from '../services/api';
 
-const router = useRouter();
 const eventos = ref([]);
 const loading = ref(false);
 const termoBusca = ref('');
+const usuario = ref(JSON.parse(localStorage.getItem('usuario_ticketpro') || '{}'));
 
-const usuarioStorage = localStorage.getItem('usuario_ticketpro');
-const usuario = ref(usuarioStorage ? JSON.parse(usuarioStorage) : {});
-
-const iniciais = computed(() => {
-  const nome = usuario.value.nome || 'U';
-  return nome.substring(0, 2).toUpperCase();
-});
+const modal = ref({ aberto: false, tipo: '', titulo: '', label: '', valor: 1, min: 1, max: 999999, step: 1, eventoAlvo: null, erro: '' });
+const inputModal = ref(null);
 
 const eventosFiltrados = computed(() => {
   if (!termoBusca.value) return eventos.value;
   const termo = termoBusca.value.toLowerCase();
-  return eventos.value.filter(e => 
-    e.nome.toLowerCase().includes(termo) || 
-    e.localizacao.toLowerCase().includes(termo)
-  );
+  return eventos.value.filter(e => e.nome.toLowerCase().includes(termo) || e.localizacao.toLowerCase().includes(termo));
 });
 
-const formatarData = (dataObj) => {
-  if (!dataObj) return 'Data a definir';
-  
-  if (typeof dataObj === 'string') return new Date(dataObj).toLocaleString('pt-BR');
-
-  if (dataObj.date && dataObj.time) {
-    const { day, month, year } = dataObj.date;
-    const { hour, minute } = dataObj.time;
-    const pad = (n) => n.toString().padStart(2, '0');
-    return `${pad(day)}/${pad(month)}/${year} às ${pad(hour)}:${pad(minute)}`;
-  }
-
-  return 'Formato desconhecido';
+const validarApenasNumeros = (e) => {
+  let val = e.target.value.replace(/\D/g, '');
+  if (val.length > 7) val = val.slice(0, 7);
+  if (val === '') { modal.value.valor = ''; return; }
+  let num = parseInt(val);
+  if (num > modal.value.max) num = modal.value.max;
+  modal.value.valor = num;
+  e.target.value = num;
 };
 
-const carregarEventos = async () => {
-  loading.value = true;
-  try {
-    const res = await api.get('/evento', { params: { acao: 'listar' } });
-    eventos.value = res.data;
-  } catch (error) {
-    console.error("Erro ao listar eventos:", error);
-    alert("Não foi possível carregar os eventos.");
-  } finally {
-    loading.value = false;
-  }
-};
+const formatarData = (dataObj) => { if (!dataObj) return 'A definir'; if (typeof dataObj === 'string') return new Date(dataObj).toLocaleString('pt-BR'); if (dataObj.date) { const { day, month, year } = dataObj.date; const { hour, minute } = dataObj.time || { hour: 0, minute: 0 }; return `${day.toString().padStart(2,'0')}/${month.toString().padStart(2,'0')}/${year} às ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}`; } return 'Data inválida'; };
+const calcularPorcentagem = (ev) => { if (!ev.numeroMaximoIngressos) return 0; return ((ev.ingressosDisponiveis || 0) / ev.numeroMaximoIngressos) * 100; };
 
-const adicionarSaldo = async () => {
-  const valorStr = prompt("Quanto deseja adicionar ao saldo?", "50.00");
-  if (!valorStr) return;
-  
-  const valor = parseFloat(valorStr.replace(',', '.'));
-  
-  if (isNaN(valor) || valor <= 0) {
-    return alert("Por favor, digite um valor válido.");
-  }
-
-  try {
-    const res = await api.post('/usuario', {
-      usuarioId: usuario.value.id,
-      valor: valor
-    }, {
-      params: { acao: 'adicionarSaldo' }
-    });
-
-    if (res.data.status === 'SUCESSO') {
-      alert("Sucesso! " + res.data.mensagem);
-      
-      usuario.value.saldo = res.data.novoSaldo;
-      
-      localStorage.setItem('usuario_ticketpro', JSON.stringify(usuario.value));
-    } else {
-      alert("Erro: " + res.data.mensagem);
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Erro de conexão ao adicionar saldo.");
-  }
-};
-
-const comprar = async (eventoId) => {
-  if (!confirm("Confirmar compra de 1 ingresso?")) return;
-  try {
-    const res = await api.post('/pedido', {
-      usuarioId: usuario.value.id,
-      eventoId: eventoId,
-      quantidade: 1,
-      precoUnitario: 100.00
-    }, {
-      params: { acao: 'comprar' }
-    });
-    
-    if (res.data.status === 'SUCESSO' || res.data.status === 'PROCESSANDO') {
-      alert(res.data.mensagem || 'Pedido realizado!');
-    } else {
-      alert("Erro: " + res.data.mensagem);
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Erro ao processar compra.");
-  }
-};
-
-const logout = () => {
-  localStorage.removeItem('usuario_ticketpro');
-  router.push('/');
-};
-
-onMounted(() => {
-  if (!usuario.value.id) router.push('/');
-  carregarEventos();
-});
+const carregarEventos = async () => { loading.value = true; try { const res = await axios.get('http://localhost:8082/eventos'); eventos.value = res.data; } catch (error) { console.error(error); } finally { loading.value = false; } };
+const excluirEvento = async (id) => { if (!confirm("Tem certeza que deseja EXCLUIR este evento?")) return; try { const res = await api.post('/evento', { id }, { params: { acao: 'excluir' } }); if (res.data.status === 'SUCESSO') { alert("Evento excluído!"); carregarEventos(); } else { alert("Erro: " + res.data.mensagem); } } catch (e) { alert("Erro ao excluir."); } };
+const abrirModal = (tipo, evento) => { modal.value = { aberto: true, tipo, titulo: tipo === 'comprar' ? `Comprar: ${evento.nome}` : 'Simular Stress Test', label: 'Quantidade:', valor: tipo === 'stress' ? 50 : 1, min: 1, max: tipo === 'stress' ? 500 : (evento.ingressosDisponiveis || 1), step: 1, eventoAlvo: evento, erro: '' }; nextTick(() => { if(inputModal.value) inputModal.value.focus(); }); };
+const fecharModal = () => { modal.value.aberto = false; };
+const confirmarModal = async () => { const valor = parseInt(modal.value.valor); if (isNaN(valor) || valor < modal.value.min) { modal.value.erro = `A quantidade mínima é ${modal.value.min}.`; return; } modal.value.tipo === 'comprar' ? await executarCompra(modal.value.eventoAlvo, valor) : await executarStress(modal.value.eventoAlvo.id, valor); fecharModal(); };
+const executarCompra = async (evento, quantidade) => { const usuarioLocal = JSON.parse(localStorage.getItem('usuario_ticketpro') || '{}'); if (usuarioLocal.saldo < evento.preco * quantidade) { alert(`Saldo insuficiente.`); return; } try { const res = await fetch('http://localhost:8081/pedido?acao=comprar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarioId: usuarioLocal.id, eventoId: evento.id, quantidade, precoUnitario: evento.preco }) }); const data = await res.json(); if (data.status === 'SUCESSO') { alert(`Pedido #${data.pedidoId} enviado!`); setTimeout(() => location.reload(), 1500); } else { alert("Erro: " + data.mensagem); } } catch (e) { alert("Erro de conexão."); } };
+const executarStress = async (eventoId, quantidadePedidos) => { const requests = []; loading.value = true; for (let i = 0; i < quantidadePedidos; i++) { requests.push(fetch('http://localhost:8081/pedido?acao=comprar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarioId: usuario.value.id, eventoId, quantidade: 1, precoUnitario: 100.00 }) }).then(res => res.json())); } try { const resultados = await Promise.all(requests); const sucessos = resultados.filter(r => r.status === 'SUCESSO').length; alert(`Stress Test: ${sucessos} / ${quantidadePedidos} pedidos aceitos.`); setTimeout(() => location.reload(), 2000); } catch (e) { console.error(e); } finally { loading.value = false; } };
+onMounted(() => carregarEventos());
 </script>
 
 <style scoped>
-.dashboard-layout {
-  display: flex;
-  min-height: 100vh;
-  background-color: #f4f6f8;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.sidebar {
-  width: 280px;
-  background: #2c3e50;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
-.user-info {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.avatar {
-  width: 80px;
-  height: 80px;
-  background: #3498db;
-  border-radius: 50%;
-  margin: 0 auto 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  font-weight: bold;
-}
-
-.saldo-box {
-  background: rgba(255,255,255,0.1);
-  padding: 15px;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.saldo-box h2 { color: #2ecc71; margin: 5px 0; }
-
-.btn-add-saldo {
-  background: #27ae60;
-  border: none;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  width: 100%;
-}
-
-.menu { display: flex; flex-direction: column; gap: 10px; }
-
-.menu-item {
-  text-decoration: none;
-  color: #ecf0f1;
-  padding: 12px;
-  border-radius: 6px;
-  transition: background 0.2s;
-  text-align: left;
-}
-
-.menu-item:hover { background: #34495e; }
-.btn-logout { background: #c0392b; border: none; cursor: pointer; color: white; margin-top: auto; }
-
-.content {
-  flex: 1;
-  padding: 40px;
-  overflow-y: auto;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-}
-
-.search-box input {
-  padding: 10px 15px;
-  width: 300px;
-  border: 1px solid #ddd;
-  border-radius: 20px;
-  outline: none;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
-}
-
-.card {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  transition: transform 0.2s;
-  display: flex;
-  flex-direction: column;
-}
-
-.card:hover { transform: translateY(-5px); }
-
-.card-header {
-  background: #3498db;
-  color: white;
-  padding: 15px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.card-header h3 { margin: 0; font-size: 1.1rem; }
-.badge { background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px; font-size: 0.9rem; }
-
-.card-body { padding: 20px; flex: 1; }
-.card-body p { margin: 10px 0; color: #555; }
-
-.btn-comprar {
-  background: #e67e22;
-  color: white;
-  border: none;
-  padding: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-comprar:hover { background: #d35400; }
+.header-content { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.search-box input { width: 300px; border-radius: 20px; }
+.loading-state { text-align: center; color: #777; font-size: 1.2rem; margin-top: 50px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
+.card-evento { display: flex; flex-direction: column; height: 100%; transition: transform 0.2s; }
+.card-evento:hover { transform: translateY(-3px); }
+.header-top { display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 10px; }
+.header-top h3 { margin: 0; font-size: 1.1rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.btn-trash { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 0; opacity: 0.6; transition: 0.2s; flex-shrink: 0; }
+.btn-trash:hover { opacity: 1; transform: scale(1.1); }
+.price-badge { background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; color: #333; margin-top: 8px; display: inline-block; }
+.card-body p { margin: 8px 0; color: #666; font-size: 0.95rem; }
+.info-row { display: flex; align-items: center; margin: 8px 0; color: #666; font-size: 0.95rem; }
+.info-row strong { white-space: nowrap; margin-right: 5px; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; display: block; }
+.disponibilidade { margin: 15px 0; font-size: 0.85rem; color: #555; }
+.progress-bar { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--success); transition: width 0.4s ease; }
+.card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 15px; }
+.btn-full { flex: 1; }
+.btn-stress { background: #9b59b6; color: white; width: 45px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.btn-stress:hover { background: #8e44ad; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.modal-content h3 { margin-top: 0; margin-bottom: 20px; color: #333; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 5px; display: block; }
+.info-text { display: block; font-size: 0.8rem; color: #777; margin-top: 5px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+input[type=tel] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1.2rem; text-align: center; box-sizing: border-box; }
+input[type=tel]:focus { border-color: #3498db; outline: none; }
 </style>

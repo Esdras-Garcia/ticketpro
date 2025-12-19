@@ -27,7 +27,6 @@ public class PedidoControlador extends HttpServlet {
     }
 
     protected void processarRequisicao(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        configurarCORS(resp);
         resp.setContentType("application/json; charset=UTF-8");
         PrintWriter out = resp.getWriter();
 
@@ -77,11 +76,5 @@ public class PedidoControlador extends HttpServlet {
             e.printStackTrace();
             out.print("{\"status\": \"ERRO\", \"mensagem\": \"Erro interno: " + e.getMessage() + "\"}");
         }
-    }
-
-    private void configurarCORS(HttpServletResponse resp) {
-        resp.setHeader("Access-Control-Allow-Origin", "*");
-        resp.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-        resp.setHeader("Access-Control-Allow-Headers", "Content-Type");
     }
 }

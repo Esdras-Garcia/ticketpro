@@ -4,13 +4,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 
 public class UsuarioControlador extends HttpServlet {
 
@@ -18,7 +18,16 @@ public class UsuarioControlador extends HttpServlet {
     private Gson gson = new Gson();
 
     @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        processarRequisicao(req, resp);
+    }
+
+    @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        processarRequisicao(req, resp);
+    }
+
+    protected void processarRequisicao(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         resp.setContentType("application/json; charset=UTF-8");
         PrintWriter out = resp.getWriter();
 
@@ -29,42 +38,73 @@ public class UsuarioControlador extends HttpServlet {
             return;
         }
 
+        JsonObject json = null;
         try {
-
             BufferedReader reader = req.getReader();
-            JsonObject json = gson.fromJson(reader, JsonObject.class);
-            
+            if (reader != null) {
+                try {
+                    json = gson.fromJson(reader, JsonObject.class);
+                } catch (JsonSyntaxException e) {
+                }
+            }
+        } catch (Exception e) {
+        }
+
+        try {
             switch (acao) {
+                case "buscar":
+                    String idStr = req.getParameter("id");
+                    if (idStr == null && json != null && json.has("id")) {
+                        idStr = json.get("id").getAsString();
+                    }
+                    
+                    if (idStr != null) {
+                        out.print(usuarioBO.buscar(Integer.parseInt(idStr)));
+                    } else {
+                        out.print("{\"status\": \"ERRO\", \"mensagem\": \"ID obrigatório.\"}");
+                    }
+                    break;
+
                 case "login":
-                    String emailLogin = json.get("email").getAsString();
-                    String senhaLogin = json.get("senha").getAsString();
-                    out.print(usuarioBO.login(emailLogin, senhaLogin));
+                    if (json == null) { out.print(erroJson()); return; }
+                    out.print(usuarioBO.login(
+                        json.get("email").getAsString(), 
+                        json.get("senha").getAsString()
+                    ));
                     break;
 
                 case "cadastro":
-                    String nome = json.get("nome").getAsString();
-                    String emailCad = json.get("email").getAsString();
-                    String senhaCad = json.get("senha").getAsString();
-                    out.print(usuarioBO.cadastrar(nome, emailCad, senhaCad));
+                    if (json == null) { out.print(erroJson()); return; }
+                    out.print(usuarioBO.cadastrar(
+                        json.get("nome").getAsString(),
+                        json.get("email").getAsString(),
+                        json.get("senha").getAsString()
+                    ));
                     break;
 
                 case "recuperarSenha":
-                    String emailRec = json.get("email").getAsString();
-                    String novaSenha = json.get("senha").getAsString();
-                    out.print(usuarioBO.recuperarSenha(emailRec, novaSenha));
+                    if (json == null) { out.print(erroJson()); return; }
+                    out.print(usuarioBO.recuperarSenha(
+                        json.get("email").getAsString(),
+                        json.get("senha").getAsString()
+                    ));
                     break;
 
                 case "editar":
-                    int idUser = json.get("id").getAsInt();
-                    String novoNome = json.get("nome").getAsString();
-                    String novoEmail = json.get("email").getAsString();
-                    out.print(usuarioBO.editar(idUser, novoNome, novoEmail));
+                    if (json == null) { out.print(erroJson()); return; }
+                    out.print(usuarioBO.editar(
+                        json.get("id").getAsInt(),
+                        json.get("nome").getAsString(),
+                        json.get("email").getAsString()
+                    ));
                     break;
 
                 case "adicionarSaldo":
-                    int idParaSaldo = json.get("usuarioId").getAsInt();
-                    BigDecimal valorSaldo = json.get("valor").getAsBigDecimal();
-                    out.print(usuarioBO.adicionarSaldo(idParaSaldo, valorSaldo));
+                    if (json == null) { out.print(erroJson()); return; }
+                    out.print(usuarioBO.adicionarSaldo(
+                        json.get("usuarioId").getAsInt(),
+                        json.get("valor").getAsBigDecimal()
+                    ));
                     break;
 
                 default:
@@ -73,7 +113,11 @@ public class UsuarioControlador extends HttpServlet {
             }
         } catch (Exception e) {
             e.printStackTrace();
-            out.print("{\"status\": \"ERRO\", \"mensagem\": \"Erro interno no servidor.\"}");
+            out.print("{\"status\": \"ERRO\", \"mensagem\": \"Erro interno: " + e.getMessage() + "\"}");
         }
+    }
+    
+    private String erroJson() {
+        return "{\"status\": \"ERRO\", \"mensagem\": \"JSON inválido ou vazio.\"}";
     }
 }

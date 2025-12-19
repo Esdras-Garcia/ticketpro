@@ -2,11 +2,15 @@ package com.ticketpro.evento;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+
+import com.ticketpro.ingresso.IngressoDAO;
 
 public class EventoBO {
 
@@ -15,7 +19,7 @@ public class EventoBO {
     
     private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    public String cadastrar(String nome, String dataTexto, String localizacao) {
+    public String cadastrar(String nome, String dataTexto, String localizacao, int qtd, BigDecimal preco) {
         Map<String, Object> resp = new HashMap<>();
         try {
             LocalDateTime dataEvento = LocalDateTime.parse(dataTexto, formatter);
@@ -25,14 +29,37 @@ public class EventoBO {
                 resp.put("mensagem", "A data do evento deve ser no futuro.");
                 return gson.toJson(resp);
             }
+            
+            if (qtd <= 0) {
+                resp.put("status", "ERRO");
+                resp.put("mensagem", "Capacidade deve ser positiva.");
+                return gson.toJson(resp);
+            }
+            if (preco.compareTo(BigDecimal.ZERO) < 0) {
+                resp.put("status", "ERRO");
+                resp.put("mensagem", "Preço não pode ser negativo.");
+                return gson.toJson(resp);
+            }
 
-            Evento novo = new Evento(nome, dataEvento, localizacao);
-            if (dao.salvar(novo)) {
-                resp.put("status", "SUCESSO");
-                resp.put("mensagem", "Evento criado.");
+            Evento novo = new Evento(nome, dataEvento, localizacao, qtd, preco);
+            
+            int novoId = dao.salvar(novo);
+
+            IngressoDAO ingressoDAO = new IngressoDAO();
+            
+            if (novoId > 0) {
+                boolean ingressosGerados = ingressoDAO.gerarLote(novoId, "LOTE-1", qtd, preco);
+                
+                if (ingressosGerados) {
+                    resp.put("status", "SUCESSO");
+                    resp.put("mensagem", "Evento criado e " + qtd + " ingressos gerados!");
+                } else {
+                    resp.put("status", "ALERTA");
+                    resp.put("mensagem", "Evento criado, mas falha ao gerar ingressos.");
+                }
             } else {
                 resp.put("status", "ERRO");
-                resp.put("mensagem", "Erro ao salvar.");
+                resp.put("mensagem", "Erro ao salvar evento no banco.");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -83,12 +110,12 @@ public class EventoBO {
     public String excluir(int id) {
         Map<String, Object> resp = new HashMap<>();
         try {
-            if (dao.excluir(id)) {
+            if (dao.desativar(id)) {
                 resp.put("status", "SUCESSO");
-                resp.put("mensagem", "Evento excluído (inativado).");
+                resp.put("mensagem", "Evento excluído (inativado) com sucesso.");
             } else {
                 resp.put("status", "ERRO");
-                resp.put("mensagem", "Erro ao excluir.");
+                resp.put("mensagem", "Erro ao excluir: Evento não encontrado.");
             }
         } catch (Exception e) {
             e.printStackTrace();
